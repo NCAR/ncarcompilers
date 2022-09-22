@@ -37,7 +37,7 @@ function get_module_flags {
 
             if [[ ${!rankvar}z != z ]]; then
                 if [[ ${!rankvar} == *[!0-9]* ]]; then
-                    2>&1 echo "Warning: $rankvar is not an integer (${!rankvar})"
+                    2>&1 echo "NCAR_WARN: $rankvar is not an integer (${!rankvar})"
                     varlist="$varlist 0:$var"
                 else
                     varlist="$varlist ${!rankvar}:$var"
@@ -153,26 +153,58 @@ else
     # Process arguments and preserve "user" arg formatting
     userargs=()
 
-    for arg in "$@"; do
-        case "$arg" in
-            --ncar-debug-include)
-                echo ${margs[INC]}
-                exit 0
-                ;;
-            --ncar-debug-libraries)
-                echo ${margs[LIBS]} ${margs[LDFLAGS]}
-                exit 0
-                ;;
-            --ncar-print-opts)
-                show=true
-                ;;
-            *)
-                if [[ " ${margs[LIBS]} " != *" $arg "* ]]; then
-                    userargs+=("$arg")
-                fi
-                ;;
-        esac
-    done
+    if [[ -n $NCAR_WRAPPER_INTEL_CHECK ]]; then
+        for arg in "$@"; do
+            case "$arg" in
+                --ncar-debug-include)
+                    echo ${margs[INC]}
+                    exit 0
+                    ;;
+                --ncar-debug-libraries)
+                    echo ${margs[LIBS]} ${margs[LDFLAGS]}
+                    exit 0
+                    ;;
+                --ncar-print-opts)
+                    show=true
+                    ;;
+                *)
+                    if [[ " ${margs[LIBS]} " != *" $arg "* ]]; then
+                        if [[ $arg == -x* ]] || [[ $arg == -ax* ]]; then
+                            intel_flag_warning=true
+                        fi
+
+                        userargs+=("$arg")
+                    fi
+                    ;;
+            esac
+        done
+
+        if [[ $intel_flag_warning == true ]]; then
+            >&2 echo "NCAR_WARN: Intel -x/-ax options hurt performance on AMD CPUs! Use -march instead."
+        fi
+    else
+        for arg in "$@"; do
+            case "$arg" in
+                --ncar-debug-include)
+                    echo ${margs[INC]}
+                    exit 0
+                    ;;
+                --ncar-debug-libraries)
+                    echo ${margs[LIBS]} ${margs[LDFLAGS]}
+                    exit 0
+                    ;;
+                --ncar-print-opts)
+                    show=true
+                    ;;
+                *)
+                    if [[ " ${margs[LIBS]} " != *" $arg "* ]]; then
+                        userargs+=("$arg")
+                    fi
+                    ;;
+            esac
+        done
+
+    fi
 
     # Call command with module and user args
     if [[ $show == true ]]; then
