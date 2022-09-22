@@ -4,7 +4,12 @@ PREFIX=$1
 cd $PREFIX
 shift
 
-if [[ $PREFIX == *mpi ]]; then
+if [[ $BASEBINS == true ]]; then 
+    for compbin in $@; do
+        echo "ln -s wrapper.sh $compbin"
+        ln -s wrapper.sh $compbin
+    done
+elif [[ $PREFIX == *mpi ]]; then
     for mpibin in $@; do
         echo "ln -s ../wrapper.sh $mpibin"
         ln -s ../wrapper.sh $mpibin

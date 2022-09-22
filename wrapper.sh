@@ -1,130 +1,193 @@
 #!/bin/bash
 
 # Determine basename and path of call
-MYPATH="$( cd "$(dirname "$0")" ; pwd )"
-MYNAME=${0##*/}
-ENVBIN=$(which $MYNAME)
+mypath="$( cd "$(dirname "$0")" ; pwd )"
+myname=${0##*/}
+myparent=$(ps -o comm= $PPID)
+envbin=$(which $myname)
 
 # Remove current instance of wrapper from PATH, if set
-if cmp --silent $ENVBIN $MYPATH/$MYNAME; then
-    NEWPATH=${PATH/${ENVBIN%/*}:}
+if cmp --silent $envbin $mypath/$myname; then
+    newpath=${PATH/${envbin%/*}:}
 
-    if [[ $NEWPATH == $PATH ]]; then
-        echo "NCAR_ERROR: cannot remove wrapper from path"
+    if [[ $newpath == $PATH ]]; then
+        2>&1 echo "NCAR_ERROR: cannot remove wrapper from path"
         exit 1
     else
-        export PATH=$NEWPATH
+        export PATH=$newpath
     fi
 fi
 
 # Check for existence of actual binary
-if ! which $MYNAME >& /dev/null; then
-    echo "NCAR_ERROR: wrapper cannot locate path to $MYNAME"
-    exit 1
-fi
+function check_binary {
+    if ! which $1 >& /dev/null; then
+        2>&1 echo "NCAR_ERROR: wrapper cannot locate path to $1"
+        exit 1
+    fi
+}
 
 # Function to collect module settings from environment
 function get_module_flags {
-    VARTYPE=$1 PREFIX=$2 RAWLIST="$3" VARLIST=
-    [[ ${RAWLIST}z == z ]] && return
+    vartype=$1 prefix=$2 rawlist="$3" varlist=
+    [[ ${rawlist}z == z ]] && return
 
-    for VAR in $RAWLIST; do
-        RANKVAR=${VAR/NCAR_$VARTYPE/NCAR_RANK}
+    if [[ $userank == true ]]; then
+        for var in $rawlist; do
+            rankvar=${var/NCAR_$vartype/NCAR_RANK}
 
-        if [[ ${!RANKVAR}z != z ]]; then
-            if [[ ${!RANKVAR} == *[!0-9]* ]]; then
-                echo "Warning: $RANKVAR is not an integer (${!RANKVAR})"
-                VARLIST="$VARLIST 0:$VAR"
+            if [[ ${!rankvar}z != z ]]; then
+                if [[ ${!rankvar} == *[!0-9]* ]]; then
+                    2>&1 echo "Warning: $rankvar is not an integer (${!rankvar})"
+                    varlist="$varlist 0:$var"
+                else
+                    varlist="$varlist ${!rankvar}:$var"
+                fi
             else
-                VARLIST="$VARLIST ${!RANKVAR}:$VAR"
+                varlist="$varlist 0:$var"
             fi
-        else
-            VARLIST="$VARLIST 0:$VAR"
-        fi
-    done
+        done
 
-    VARLIST=$(echo $VARLIST | xargs -n1 | sort -nr | cut -d: -f2 | xargs)
+        varlist=$(echo $varlist | xargs -n1 | sort -nr | cut -d: -f2 | xargs)
+    else
+        varlist=$rawlist
+    fi
 
-    for VAR in $VARLIST; do
-        MARGS[$VARTYPE]="${PREFIX}${!VAR} ${MARGS[$VARTYPE]}"
+    for var in $varlist; do
+        margs[$vartype]="${prefix}${!var} ${margs[$vartype]}"
     done
 }
 
-# Skip wrapper if it has already been called
-if [[ $NCAR_WRAPPER_ACTIVE == true ]]; then
+# Skip wrapper if it has already been called or if it's called by Cray wrapper
+if [[ $NCAR_WRAPPER_ACTIVE == true ]] || [[ " cc CC ftn " == *" $myparent "* ]]; then
+    check_binary $myname
+
     # Preserve quotes from input arguments
-    for ARG in "$@"; do
-        INARGS+=("$ARG")
+    for arg in "$@"; do
+        inargs+=("$arg")
     done
 
-    $MYNAME "${INARGS[@]}"
+    $myname "${inargs[@]}"
 else
+    # If Cray wrappers are being used, convert names to Cray...
+    if [[ -n $CRAYPE_DIR ]] && [[ ${NCAR_WRAPPER_CRAY,,} != false ]]; then
+        case $myname in
+            icc|icx|pgcc|nvc|craycc)
+                myname=cc
+                ;;
+            icpc|icpx|pgc++|nvc++|crayCC|craycxx)
+                myname=CC
+                ;;
+            ifort|ifx|pgf77|pgf90|pgf95|pgfortran|nvfortran|crayftn)
+                myname=ftn
+                ;;
+            gcc)
+                if [[ $PE_ENV == GNU ]]; then
+                    myname=cc
+                fi
+                ;;
+            g++)
+                if [[ $PE_ENV == GNU ]]; then
+                    myname=CC
+                fi
+                ;;
+            gfortran)
+                if [[ $PE_ENV == GNU ]]; then
+                    myname=ftn
+                fi
+                ;;
+            *)
+                if [[ -n $CRAY_MPICH_DIR ]]; then
+                    case $myname in
+                        mpicc)
+                            myname=cc
+                            ;;
+                        mpic++|mpicxx)
+                            myname=CC
+                            ;;
+                        mpif77|mpif90|mpifort)
+                            myname=ftn
+                            ;;
+                    esac
+                fi
+                ;;
+        esac
+    fi
+
+    check_binary $myname
+
+    # Do we need to deal with ranking?
+    if [[ -n ${!NCAR_RANK*} ]]; then
+        userank=true
+    fi
+
     # Associative storage for variables
-    declare -A MARGS
+    declare -A margs
+
+    # Get any modifier flags that must go first
+    if [[ " gcc g++ gfortran " != *" $myname "* ]]; then
+        margs[MFLAGS]=$NCAR_MFLAGS_COMPILER
+    fi
 
     # Add headers to compile line
     get_module_flags INC -I "${!NCAR_INC_*}"
 
-    # Add library paths to link line
-    get_module_flags LDFLAGS -Wl,-rpath, "${!NCAR_LDFLAGS_*}"
-    get_module_flags LDFLAGS -L "${!NCAR_LDFLAGS_*}"
+    if [[ " $@ " != *" -c "* ]]; then
+        # Add library paths to link line
+        get_module_flags LDFLAGS -Wl,-rpath, "${!NCAR_LDFLAGS_*}"
+        get_module_flags LDFLAGS -L "${!NCAR_LDFLAGS_*}"
 
-    # Get any modifier flags that must go first
-    if [[ " gcc g++ gfortran " != *" $MYNAME "* ]]; then
-        MARGS[MFLAGS]=$NCAR_MFLAGS_COMPILER
-    fi
+        # Make sure RPATHs are respected by newer ldd
+        margs[LDFLAGS]="-Wl,--disable-new-dtags ${margs[LDFLAGS]}"
 
-    # Make sure RPATHs are respected by newer ldd
-    MARGS[LDFLAGS]="-Wl,--disable-new-dtags ${MARGS[LDFLAGS]}"
+        # Add library flags if desired
+        if [[ -z ${NCAR_EXCLUDE_LIBS+x} ]]; then
+            get_module_flags LIBS "" "${!NCAR_LIBS_*}"
+        fi
 
-    # Add library flags if desired
-    if [[ -z ${NCAR_EXCLUDE_LIBS+x} ]]; then
-        get_module_flags LIBS "" "${!NCAR_LIBS_*}"
-    fi
-
-    # Add asneeded unless disabled
-    if [[ -z ${NCAR_EXCLUDE_ASNEEDED} ]]; then
-        MARGS[LIBS]="-Wl,--as-needed ${MARGS[LIBS]}"
+        # Only add as-needed flag if we configure this behavior
+        if [[ -n $NCAR_USE_ASNEEDED ]]; then
+            margs[LIBS]="-Wl,--as-needed ${margs[LIBS]}"
+        fi
     fi
 
     # Process arguments and preserve "user" arg formatting
-    USERARGS=()
+    userargs=()
 
-    for ARG in "$@"; do
-        case "$ARG" in
+    for arg in "$@"; do
+        case "$arg" in
             --ncar-debug-include)
-                echo ${MARGS[INC]}
+                echo ${margs[INC]}
                 exit 0
                 ;;
             --ncar-debug-libraries)
-                echo ${MARGS[LIBS]} ${MARGS[LDFLAGS]}
+                echo ${margs[LIBS]} ${margs[LDFLAGS]}
                 exit 0
                 ;;
-            --show)
-                SHOW=TRUE
+            --ncar-print-opts)
+                show=true
                 ;;
             *)
-                if [[ " ${MARGS[LIBS]} " != *" $ARG "* ]]; then
-                    USERARGS+=("$ARG")
+                if [[ " ${margs[LIBS]} " != *" $arg "* ]]; then
+                    userargs+=("$arg")
                 fi
                 ;;
         esac
     done
 
     # Call command with module and user args
-    if [[ $SHOW == TRUE ]]; then
+    if [[ $show == true ]]; then
         if [[ $NCAR_WRAPPER_PREPEND_RPATH == true ]]; then
-            echo "${MYNAME} ${MARGS[MFLAGS]} ${MARGS[LDFLAGS]} ${USERARGS[@]} ${MARGS[INC]} ${MARGS[LIBS]}"
+            echo "${myname} ${margs[MFLAGS]} ${margs[LDFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]}"
         else
-            echo "${MYNAME} ${MARGS[MFLAGS]} ${USERARGS[@]} ${MARGS[INC]} ${MARGS[LIBS]} ${MARGS[LDFLAGS]}"
+            echo "${myname} ${margs[MFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}"
         fi
     else
         export NCAR_WRAPPER_ACTIVE=true
 
         if [[ $NCAR_WRAPPER_PREPEND_RPATH == true ]]; then
-            $MYNAME ${MARGS[MFLAGS]} ${MARGS[LDFLAGS]} "${USERARGS[@]}" ${MARGS[INC]} ${MARGS[LIBS]}
+            $myname ${margs[MFLAGS]} ${margs[LDFLAGS]} "${userargs[@]}" ${margs[INC]} ${margs[LIBS]}
         else
-            $MYNAME ${MARGS[MFLAGS]} "${USERARGS[@]}" ${MARGS[INC]} ${MARGS[LIBS]} ${MARGS[LDFLAGS]}
+            $myname ${margs[MFLAGS]} "${userargs[@]}" ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}
         fi
     fi
 fi
