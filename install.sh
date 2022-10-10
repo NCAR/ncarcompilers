@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PREFIX=$1
+mkdir -p $PREFIX
 cd $PREFIX
 shift
 
