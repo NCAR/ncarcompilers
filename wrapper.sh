@@ -71,6 +71,12 @@ else
     # If Cray wrappers are being used, convert names to Cray...
     if [[ -n $CRAYPE_DIR ]] && [[ ${NCAR_WRAPPER_CRAY,,} != false ]]; then
         case $myname in
+            icc|icpc|ifort)
+                export INTEL_COMPILER_TYPE=CLASSIC
+                ;;&
+            icx|icpx|ifx)
+                export INTEL_COMPILER_TYPE=ONEAPI
+                ;;&
             icc|icx|pgcc|nvc|craycc)
                 myname=cc
                 ;;
