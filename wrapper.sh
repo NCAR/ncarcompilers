@@ -129,30 +129,32 @@ else
     # Associative storage for variables
     declare -A margs
 
-    # Get any modifier flags that must go first
-    if [[ " gcc g++ gfortran " != *" $myname "* ]]; then
-        margs[MFLAGS]=$NCAR_MFLAGS_COMPILER
-    fi
-
-    # Add headers to compile line
-    get_module_flags INC -I "${!NCAR_INC_*}"
-
-    if [[ " $@ " != *" -c "* ]]; then
-        # Add library paths to link line
-        get_module_flags LDFLAGS -Wl,-rpath, "${!NCAR_LDFLAGS_*}"
-        get_module_flags LDFLAGS -L "${!NCAR_LDFLAGS_*}"
-
-        # Make sure RPATHs are respected by newer ldd
-        margs[LDFLAGS]="-Wl,--disable-new-dtags ${margs[LDFLAGS]}"
-
-        # Add library flags if desired
-        if [[ -z ${NCAR_EXCLUDE_LIBS+x} ]]; then
-            get_module_flags LIBS "" "${!NCAR_LIBS_*}"
+    if [[ " $@ " != *" -help "* ]]; then
+        # Get any modifier flags that must go first
+        if [[ " gcc g++ gfortran " != *" $myname "* ]]; then
+            margs[MFLAGS]=$NCAR_MFLAGS_COMPILER
         fi
 
-        # Only add as-needed flag if we configure this behavior
-        if [[ -n $NCAR_USE_ASNEEDED ]]; then
-            margs[LIBS]="-Wl,--as-needed ${margs[LIBS]}"
+        # Add headers to compile line
+        get_module_flags INC -I "${!NCAR_INC_*}"
+
+        if [[ " $@ " != *" -c "* ]]; then
+            # Add library paths to link line
+            get_module_flags LDFLAGS -Wl,-rpath, "${!NCAR_LDFLAGS_*}"
+            get_module_flags LDFLAGS -L "${!NCAR_LDFLAGS_*}"
+
+            # Make sure RPATHs are respected by newer ldd
+            margs[LDFLAGS]="-Wl,--disable-new-dtags ${margs[LDFLAGS]}"
+
+            # Add library flags if desired
+            if [[ -z ${NCAR_EXCLUDE_LIBS+x} ]]; then
+                get_module_flags LIBS "" "${!NCAR_LIBS_*}"
+            fi
+
+            # Only add as-needed flag if we configure this behavior
+            if [[ -n $NCAR_USE_ASNEEDED ]]; then
+                margs[LIBS]="-Wl,--as-needed ${margs[LIBS]}"
+            fi
         fi
     fi
 
