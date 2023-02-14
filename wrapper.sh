@@ -217,9 +217,9 @@ else
     # Call command with module and user args
     if [[ $show == true ]]; then
         if [[ $NCAR_WRAPPER_PREPEND_RPATH == true ]]; then
-            echo "${myname} ${margs[MFLAGS]} ${margs[LDFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]}"
+            echo "${margs[MFLAGS]} ${margs[LDFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]}"
         else
-            echo "${myname} ${margs[MFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}"
+            echo "${margs[MFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}"
         fi
     else
         export NCAR_WRAPPER_ACTIVE=true
