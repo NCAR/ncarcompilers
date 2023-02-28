@@ -57,8 +57,13 @@ function get_module_flags {
     done
 }
 
-# Skip wrapper if it has already been called or if it's called by Cray wrapper
-if [[ $NCAR_WRAPPER_ACTIVE == true ]] || [[ " cc CC ftn " == *" $myparent "* ]]; then
+# Skip wrapper if:
+# - It has already been called
+# - If it's called by a Cray wrapper
+# - It has been called by golang
+if [[ $NCAR_WRAPPER_ACTIVE == true ]]           \
+    || [[ " cc CC ftn " == *" $myparent "* ]]   \
+    || [[ -n ${!CGO_*} ]]; then
     check_binary $myname
 
     # Preserve quotes from input arguments
