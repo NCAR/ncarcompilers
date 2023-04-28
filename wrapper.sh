@@ -30,27 +30,7 @@ function check_binary {
 function get_module_flags {
     vartype=$1 prefix=$2 rawlist="$3" varlist=
     [[ ${rawlist}z == z ]] && return
-
-    if [[ $userank == true ]]; then
-        for var in $rawlist; do
-            rankvar=${var/NCAR_$vartype/NCAR_RANK}
-
-            if [[ ${!rankvar}z != z ]]; then
-                if [[ ${!rankvar} == *[!0-9]* ]]; then
-                    2>&1 echo "NCAR_WARN: $rankvar is not an integer (${!rankvar})"
-                    varlist="$varlist 0:$var"
-                else
-                    varlist="$varlist ${!rankvar}:$var"
-                fi
-            else
-                varlist="$varlist 0:$var"
-            fi
-        done
-
-        varlist=$(echo $varlist | xargs -n1 | sort -nr | cut -d: -f2 | xargs)
-    else
-        varlist=$rawlist
-    fi
+    varlist=$rawlist
 
     for var in $varlist; do
         margs[$vartype]="${prefix}${!var} ${margs[$vartype]}"
@@ -125,11 +105,6 @@ else
     fi
 
     check_binary $myname
-
-    # Do we need to deal with ranking?
-    if [[ -n ${!NCAR_RANK*} ]]; then
-        userank=true
-    fi
 
     # Associative storage for variables
     declare -A margs
