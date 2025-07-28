@@ -8,11 +8,11 @@ envbin=$(which $myname)
 
 # Remove current instance of wrapper from PATH, if set
 if cmp --silent $envbin $mypath/$myname; then
-    if [[ $mypath == *hip ]]; then
-        if [[ -n $NCAR_WRAPPER_HIP_CLANG ]]; then
-            newpath=${PATH/${envbin%/*}:/${NCAR_WRAPPER_HIP_CLANG}:}
+    if [[ $mypath == *llvm-amd ]]; then
+        if [[ -n $NCAR_WRAPPER_LLVM_AMD ]]; then
+            newpath=${PATH/${envbin%/*}:/${NCAR_WRAPPER_LLVM_AMD}:}
         else
-            >&2 echo "NCAR_ERROR: hip wrapper used but NCAR_WRAPPER_HIP_CLANG not set"
+            >&2 echo "NCAR_ERROR: hip wrapper used but NCAR_WRAPPER_LLVM_AMD not set"
             exit 1
         fi
     else
