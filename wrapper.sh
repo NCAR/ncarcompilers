@@ -8,10 +8,19 @@ envbin=$(which $myname)
 
 # Remove current instance of wrapper from PATH, if set
 if cmp --silent $envbin $mypath/$myname; then
-    newpath=${PATH/${envbin%/*}:}
+    if [[ $mypath == *hip ]]; then
+        if [[ -n $NCAR_WRAPPER_HIP_CLANG ]]; then
+            newpath=${PATH/${envbin%/*}:/${NCAR_WRAPPER_HIP_CLANG}:}
+        else
+            >&2 echo "NCAR_ERROR: hip wrapper used but NCAR_WRAPPER_HIP_CLANG not set"
+            exit 1
+        fi
+    else
+        newpath=${PATH/${envbin%/*}:}
+    fi
 
     if [[ $newpath == $PATH ]]; then
-        2>&1 echo "NCAR_ERROR: cannot remove wrapper from path"
+        >&2 echo "NCAR_ERROR: cannot remove wrapper from path"
         exit 1
     else
         export PATH=$newpath
@@ -21,7 +30,7 @@ fi
 # Check for existence of actual binary
 function check_binary {
     if ! which $1 >& /dev/null; then
-        2>&1 echo "NCAR_ERROR: wrapper cannot locate path to $1"
+        >&2 echo "NCAR_ERROR: wrapper cannot locate path to $1"
         exit 1
     fi
 }
@@ -62,13 +71,13 @@ else
             icx|icpx|ifx)
                 export INTEL_COMPILER_TYPE=ONEAPI
                 ;;&
-            icc|icx|pgcc|nvc|craycc)
+            icc|icx|pgcc|nvc|craycc|clang)
                 myname=cc
                 ;;
-            icpc|icpx|pgc++|nvc++|crayCC|craycxx)
+            icpc|icpx|pgc++|nvc++|crayCC|craycxx|clang++)
                 myname=CC
                 ;;
-            ifort|ifx|pgf77|pgf90|pgf95|pgfortran|nvfortran|crayftn)
+            ifort|ifx|pgf77|pgf90|pgf95|pgfortran|nvfortran|crayftn|flang)
                 myname=ftn
                 ;;
             gcc)
@@ -181,6 +190,10 @@ else
                     echo ${margs[LIBS]} ${margs[LDFLAGS]}
                     exit 0
                     ;;
+                --ncar-debug-executable)
+                    echo $(which $myname)
+                    exit 0
+                    ;;
                 --ncar-print-opts)
                     show=true
                     ;;
@@ -197,9 +210,9 @@ else
     # Call command with module and user args
     if [[ $show == true ]]; then
         if [[ $NCAR_WRAPPER_PREPEND_RPATH == true ]]; then
-            echo "${margs[MFLAGS]} ${margs[LDFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]}"
+            echo "$(which $myname) ${margs[MFLAGS]} ${margs[LDFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]}"
         else
-            echo "${margs[MFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}"
+            echo "$(which $myname) ${margs[MFLAGS]} ${userargs[@]} ${margs[INC]} ${margs[LIBS]} ${margs[LDFLAGS]}"
         fi
     else
         export NCAR_WRAPPER_ACTIVE=true
