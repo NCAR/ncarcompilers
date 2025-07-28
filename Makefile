@@ -1,10 +1,11 @@
 PREFIX ?= /usr/local
 
 abin = gcc cc CC ftn
-cbin = gfortran g++ c++ icc ifort icpc icx ifx icpx pgcc pgf77 pgf90 pgf95 pgfortran pgc++ nvc nvc++ nvfortran crayCC craycc craycxx crayftn
+hbin = clang clang++ flang
+cbin = gfortran g++ c++ icc ifort icpc icx ifx icpx pgcc pgf77 pgf90 pgf95 pgfortran pgc++ nvc nvc++ nvfortran crayCC craycc craycxx crayftn $(hbin)
 mbin = mpicc mpiCC mpigcc mpiicc mpiifort mpifort mpif77 mpif90 mpif08 mpic++ mpicxx ortecc orteCC
 
-.PHONY: all mpi install clean
+.PHONY: all mpi hip install clean
 
 all:
 	BASEBINS=true ./install.sh bin $(abin)
@@ -13,6 +14,9 @@ all:
 
 mpi:
 	./install.sh bin/mpi $(mbin)
+
+hip:
+	./install.sh bin/hip $(hbin)
 
 install:
 	mkdir -p $(PREFIX)

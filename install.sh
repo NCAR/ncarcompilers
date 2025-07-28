@@ -15,6 +15,11 @@ elif [[ $PREFIX == *mpi ]]; then
         echo "ln -s ../wrapper.sh $mpibin"
         ln -s ../wrapper.sh $mpibin
     done
+elif [[ $PREFIX == *hip ]]; then
+    for hipbin in $@; do
+        echo "ln -s ../wrapper.sh $hipbin"
+        ln -s ../wrapper.sh $hipbin
+    done
 else
     for compbin in $@; do
         if which $compbin >& /dev/null; then
