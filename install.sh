@@ -15,10 +15,10 @@ elif [[ $PREFIX == *mpi ]]; then
         echo "ln -s ../compiler_wrapper.sh $mpibin"
         ln -s ../compiler_wrapper.sh $mpibin
     done
-elif [[ $PREFIX == *hip ]]; then
-    for hipbin in $@; do
-        echo "ln -s ../compiler_wrapper.sh $hipbin"
-        ln -s ../compiler_wrapper.sh $hipbin
+elif [[ $PREFIX == *llvm-amd ]]; then
+    for llvmbin in $@; do
+        echo "ln -s ../compiler_wrapper.sh $llvmbin"
+        ln -s ../compiler_wrapper.sh $llvmbin
     done
 else
     for compbin in $@; do
