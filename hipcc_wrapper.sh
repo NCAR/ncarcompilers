@@ -30,8 +30,8 @@ check_binary $myname
 
 if [[ " $@ " == *" --ncar-debug-hipcc "* ]]; then
     echo "Real hipcc     = $(which hipcc)"
-    echo "HIP_CLANG_PATH = $NCAR_WRAPPER_LLVM_AMD"
+    echo "HIP_CLANG_PATH = $HIP_CLANG_PATH"
     exit 0
 fi
 
-HIP_CLANG_PATH=$NCAR_WRAPPER_HIP_CLANG hipcc "$@"
+NCAR_WRAPPER_LLVM_AMD=$HIP_CLANG_PATH HIP_CLANG_PATH=$NCAR_WRAPPER_HIP_CLANG hipcc "$@"
