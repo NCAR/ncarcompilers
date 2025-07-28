@@ -17,7 +17,7 @@ mpi:
 
 hip:
 	./install.sh bin/llvm-amd $(lbin)
-	mkdir -p $(PREFIX)/bin/hip
+	mkdir -p bin/hip
 	cp hipcc_wrapper.sh bin/hip/hipcc
 
 install:
