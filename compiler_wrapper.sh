@@ -120,9 +120,34 @@ else
 
     if [[ " $@ " != *" -help "* ]]; then
         # Get any modifier flags that must go first
-        if [[ " gcc g++ gfortran " != *" $myname "* ]]; then
-            margs[MFLAGS]=$NCAR_MFLAGS_COMPILER
-        fi
+        mflags_compiler=NCAR_MFLAGS_${LMOD_FAMILY_COMPILER^^}
+        margs[MFLAGS]="${!mflags_compiler} $NCAR_MFLAGS_GENERIC"
+
+        # These flags are optionally added based on other settings to assist
+        # in tasks like debugging and profiling
+        if [[ -n $NCAR_WRAPPER_MFLAGS_DEBUG ]]; then
+            mflags[MFLAGS]="${mflags[MFLAGS]} $NCAR_MFLAGS_DEBUG"
+        elif [[ -n $NCAR_WRAPPER_MFLAGS_PROFILE ]]; then
+            if [[ $LMOD_FAMILY_COMPILER == cce ]]; then
+                case $myname in
+                    crayftn|ftn|mpif90)
+                        mflags[MFLAGS]="${mflags[MFLAGS]} $NCAR_MFLAGS_PROFILE_FORTRAN"
+                        ;;
+                    *)
+                        mflags[MFLAGS]="${mflags[MFLAGS]} $NCAR_MFLAGS_PROFILE_C"
+                        ;;
+                esac
+            else
+                mflags[MFLAGS]="${mflags[MFLAGS]} $NCAR_MFLAGS_PROFILE"
+            fi
+
+            if [[ -n $NCAR_ROOT_LINARO_FORGE ]] && [[ -n $CRAY_MPICH_DIR ]]; then
+                map_wrapper_check=true
+                map_wrapper_dir=$HOME/.map_wrappers/$NCAR_VERSION_LINARO_FORGE/mpich-$LMOD_FAMILY_MPI_VERSION/$LMOD_FAMILY_COMPILER/$LMOD_FAMILY_COMPILER_VERSION
+                mflags[LDFLAGS]="-L$map_wrapper_dir -Wl,--eh-frame-hdr -Wl,-rpath,$map_wrapper_dir"
+                mflags[LIBS]="-lmap-sampler-pmpi -lmap-sampler -ldl"
+            fi
+        fi  
 
         # Add headers to compile line
         get_module_flags INC -I "${!NCAR_INC_*}"
@@ -216,6 +241,16 @@ else
         fi
     else
         export NCAR_WRAPPER_ACTIVE=true
+
+        if [[ $map_wrapper_check == true ]]; then
+            if [[ ! -e $map_wrapper_dir/libmap-sampler.so ]]; then
+                if [[ ${NCAR_WRAPPER_MAP_GENERATE:-true} == true ]]; then
+                    >&2 echo "NCAR_INFO: Creating shared sampler library for Forge MAP (NCAR_WRAPPER_MAP_GENERATE=false to disable)."
+                    mkdir -p $map_wrapper_dir
+                    make-profiler-libraries --platform=cray --lib-type=shared --quiet $map_wrapper_dir
+                fi
+            fi
+        fi
 
         if [[ $NCAR_WRAPPER_PREPEND_RPATH == true ]]; then
             $myname ${margs[MFLAGS]} ${margs[LDFLAGS]} "${userargs[@]}" ${margs[INC]} ${margs[LIBS]}
