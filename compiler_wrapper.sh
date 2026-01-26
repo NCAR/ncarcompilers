@@ -121,7 +121,7 @@ else
     if [[ " $@ " != *" -help "* ]]; then
         # Get any modifier flags that must go first
         mflags_compiler=NCAR_MFLAGS_${LMOD_FAMILY_COMPILER^^}
-        margs[MFLAGS]="${!mflags_compiler} $NCAR_MFLAGS_GENERIC"
+        margs[MFLAGS]="${!mflags_compiler} $NCAR_MFLAGS_GENERIC $NCAR_MFLAGS_COMPILER"
 
         # These flags are optionally added based on other settings to assist
         # in tasks like debugging and profiling
